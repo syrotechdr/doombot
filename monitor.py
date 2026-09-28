@@ -1,4 +1,4 @@
-"""Monitor de cartelera y alertas personales de WhatsApp. Python 3.11+."""
+"""Monitor de cartelera y alertas personales de Telegram o WhatsApp. Python 3.11+."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ class Config:
     timeout: int = 40
     retry: int = 300
     data_dir: Path = Path("data")
-    notifier: str = "callmebot"
+    notifier: str = "telegram"
 
     @classmethod
     def from_env(cls):
@@ -47,7 +47,7 @@ class Config:
             timeout=int(os.getenv("PAGE_TIMEOUT_SECONDS", "40")),
             retry=int(os.getenv("NOTIFY_RETRY_SECONDS", "300")),
             data_dir=Path(os.getenv("DATA_DIR", "data")),
-            notifier=os.getenv("NOTIFIER", "callmebot").lower(),
+            notifier=os.getenv("NOTIFIER", "telegram").lower(),
         )
         if min(config.interval, config.confirmations, config.timeout, config.retry) < 1:
             raise ValueError("Los intervalos y CONFIRMATIONS deben ser positivos.")
@@ -214,14 +214,21 @@ def required_env(name):
 
 def validate_notifier(config):
     fields = {
+        "telegram": ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"],
         "callmebot": ["CALLMEBOT_PHONE", "CALLMEBOT_API_KEY"],
         "meta": ["META_ACCESS_TOKEN", "META_PHONE_NUMBER_ID", "META_TO",
                  "META_GRAPH_VERSION", "META_TEMPLATE_NAME", "META_TEMPLATE_LANGUAGE"],
     }
     if config.notifier not in fields:
-        raise ValueError("NOTIFIER debe ser callmebot o meta.")
+        raise ValueError("NOTIFIER debe ser telegram, callmebot o meta.")
     for name in fields[config.notifier]:
         required_env(name)
+    if config.notifier == "telegram":
+        if not re.fullmatch(r"[1-9]\d*:[A-Za-z0-9_-]+", required_env("TELEGRAM_BOT_TOKEN")):
+            raise ValueError("TELEGRAM_BOT_TOKEN debe ser el token entregado por BotFather.")
+        if not re.fullmatch(r"[1-9]\d*", required_env("TELEGRAM_CHAT_ID")):
+            raise ValueError("TELEGRAM_CHAT_ID debe identificar un único chat personal con el bot.")
+        return
     phone = required_env("CALLMEBOT_PHONE" if config.notifier == "callmebot" else "META_TO")
     if config.notifier == "callmebot" and phone.endswith("@lid"):
         raise ValueError("CallMeBot devolvió un ID @lid, pero su API no acepta ese formato. Necesitas una activación válida para tu número internacional.")
@@ -250,7 +257,27 @@ def http_request(request):
 
 
 def send_notification(config, message):
-    if config.notifier == "callmebot":
+    if config.notifier == "telegram":
+        chat_id = int(required_env("TELEGRAM_CHAT_ID"))
+        payload = {"chat_id": chat_id, "text": message,
+                   "link_preview_options": {"is_disabled": True}}
+        request = Request(
+            "https://api.telegram.org/bot" + required_env("TELEGRAM_BOT_TOKEN") + "/sendMessage",
+            data=json.dumps(payload).encode(), method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            response = json.loads(http_request(request))
+            result = response.get("result")
+            accepted = (response.get("ok") is True and isinstance(result, dict)
+                        and type(result.get("message_id")) is int
+                        and result["message_id"] > 0
+                        and result.get("chat", {}).get("id") == chat_id)
+        except (ValueError, AttributeError, TypeError):
+            accepted = False
+        if not accepted:
+            raise NotificationError("Telegram no confirmó el envío al chat configurado.")
+    elif config.notifier == "callmebot":
         query = urlencode({"phone": required_env("CALLMEBOT_PHONE"), "text": message,
                            "apikey": required_env("CALLMEBOT_API_KEY")})
         response = http_request(Request("https://api.callmebot.com/whatsapp.php?" + query))
@@ -342,7 +369,7 @@ def main():
         validate_notifier(config)
     if args.test_notification:
         send_notification(config, f"Prueba del monitor de {config.title}. Esta prueba no indica venta de boletas. {config.url}")
-        LOG.info("Proveedor aceptó el mensaje de prueba; comprueba su recepción en WhatsApp.")
+        LOG.info("Proveedor aceptó el mensaje de prueba; comprueba su recepción en %s.", config.notifier)
         return 0
     config.data_dir.mkdir(parents=True, exist_ok=True)
     with (config.data_dir / "monitor.lock").open("a") as lock:
@@ -375,7 +402,7 @@ if __name__ == "__main__":
     try:
         sys.exit(main())
     except NotificationError as error:
-        LOG.error("WhatsApp: %s", error)
+        LOG.error("Notificación: %s", error)
         sys.exit(1)
     except ValueError as error:
         LOG.error("Configuración: %s", error)

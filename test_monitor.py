@@ -13,7 +13,7 @@ class MonitorTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.config = replace(m.Config(), data_dir=Path(self.temp.name))
+        self.config = replace(m.Config(), notifier="callmebot", data_dir=Path(self.temp.name))
         self.state = m.load_state(self.config)
         self.reader = Mock()
         self.sender = Mock()
@@ -162,6 +162,55 @@ class MonitorTests(unittest.TestCase):
             payload = json.loads(request.call_args.args[0].data)
             self.assertEqual(payload["type"], "template")
             self.assertEqual(payload["template"]["components"][0]["parameters"][0]["text"], "Alert Movie")
+
+    @patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": "123:fake_token", "TELEGRAM_CHAT_ID": "456"}, clear=True)
+    def test_telegram_sends_to_one_private_chat_without_parsing_text(self):
+        config = replace(self.config, notifier="telegram")
+        m.validate_notifier(config)
+        response = '{"ok":true,"result":{"message_id":7,"chat":{"id":456}}}'
+        with patch("monitor.http_request", return_value=response) as request:
+            m.send_notification(config, "¡Boletas! <sin formato> & horarios\nPelícula")
+        sent = request.call_args.args[0]
+        self.assertEqual(sent.get_method(), "POST")
+        self.assertTrue(sent.full_url.endswith("/sendMessage"))
+        payload = json.loads(sent.data)
+        self.assertEqual(payload["chat_id"], 456)
+        self.assertEqual(payload["text"], "¡Boletas! <sin formato> & horarios\nPelícula")
+        self.assertNotIn("parse_mode", payload)
+        self.assertNotIn("fake_token", sent.data.decode())
+
+    @patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": "123:fake_token", "TELEGRAM_CHAT_ID": "456"}, clear=True)
+    def test_telegram_rejects_errors_malformed_and_wrong_recipient_responses(self):
+        config = replace(self.config, notifier="telegram")
+        bodies = ['{"ok":false,"description":"private fake_token"}', '<html>fake_token</html>',
+                  '[]', '{"ok":true,"result":null}',
+                  '{"ok":true,"result":{"message_id":7,"chat":{"id":999}}}',
+                  '{"ok":true,"result":{"chat":{"id":456}}}']
+        for body in bodies:
+            with self.subTest(body=body), patch("monitor.http_request", return_value=body):
+                with self.assertRaises(m.NotificationError) as caught:
+                    m.send_notification(config, "test")
+                self.assertNotIn("fake_token", str(caught.exception))
+
+    def test_telegram_invalid_configuration_fails_before_network(self):
+        cases = [{"TELEGRAM_BOT_TOKEN": "bad", "TELEGRAM_CHAT_ID": "456"},
+                 {"TELEGRAM_BOT_TOKEN": "123:fake_token", "TELEGRAM_CHAT_ID": "-123"},
+                 {"TELEGRAM_BOT_TOKEN": "123:fake_token", "TELEGRAM_CHAT_ID": "@someone"},
+                 {"TELEGRAM_BOT_TOKEN": "123:fake_token", "TELEGRAM_CHAT_ID": ""}]
+        for env in cases:
+            with self.subTest(env=env), patch.dict("os.environ", env, clear=True):
+                with self.assertRaises(ValueError):
+                    m.validate_notifier(replace(self.config, notifier="telegram"))
+
+    @patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": "123:fake_token", "TELEGRAM_CHAT_ID": "456"}, clear=True)
+    def test_rejected_telegram_alert_remains_pending_for_retry(self):
+        config = replace(self.config, notifier="telegram", confirmations=1)
+        self.reader.read.return_value = m.Observation("available", "6:40 PM")
+        with patch("monitor.http_request", return_value='{"ok":false}'):
+            self.assertFalse(m.run_cycle(config, self.state, self.reader, now=1000))
+        self.assertEqual(self.state["sent"], [])
+        self.assertTrue(self.state["notification_error"])
+        self.assertEqual(self.state["retry_after"], 1300)
 
     def test_http_errors_do_not_expose_keys(self):
         error = HTTPError("https://example.com/?apikey=secret", 403, "secret", {}, None)

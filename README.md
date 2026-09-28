@@ -3,7 +3,7 @@
 Bot independiente para esta película en **Plaza Internacional Santiago**:
 https://rd.caribbeancinemas.com/plaza-internacional-santiago/movie/avengers-doomsday/
 
-Abre la página con Chromium, ejecuta su JavaScript y envía avisos a **un número de WhatsApp**. Puede ejecutarse **cada cinco minutos en GitHub Actions** sin administrar un servidor, o cada 60 segundos en un servidor Linux con Docker Compose.
+Abre la página con Chromium, ejecuta su JavaScript y envía avisos a **un chat privado de Telegram**. Puede ejecutarse **cada cinco minutos en GitHub Actions** sin administrar un servidor, o cada 60 segundos en un servidor Linux con Docker Compose.
 
 ## Qué detecta
 
@@ -26,26 +26,38 @@ En este modo se usa `CONFIRMATIONS=1`: avisa en la primera revisión que encuent
 
 Configuración en **Settings → Secrets and variables → Actions → Repository secrets**:
 
-- `CALLMEBOT_PHONE`: tu número internacional activado.
-- `CALLMEBOT_API_KEY`: la clave válida de CallMeBot para ese número.
+- `TELEGRAM_BOT_TOKEN`: token del bot creado con BotFather.
+- `TELEGRAM_CHAT_ID`: ID de tu chat privado con el bot (un destinatario).
 
 Estos secretos solo se pasan a los pasos que envían mensajes; no se escriben en archivos públicos. La configuración inicial se puede cargar desde tu `.env` local con `gh secret set NOMBRE` por entrada estándar, sin publicarlo en Git.
 
 El historial persiste en la rama **`codex/monitor-state`**, con un único archivo `state.json`. Solo contiene la URL pública, estados, fechas, contadores y avisos aceptados; se validan sus campos antes de publicarlos. Nunca contiene teléfono, clave, HTML ni mensajes personales. No borres esa rama: si falta o no puede recuperarse, la ejecución falla sin reiniciar la deduplicación. Los cambios de historial se guardan incluso si falla una lectura o un envío. No se permiten ejecuciones simultáneas ni sobrescrituras de cambios concurrentes.
 
-Para probarlo desde **Actions → Monitor de boletas → Run workflow**, selecciona la rama predeterminada y marca **Enviar también un WhatsApp de prueba**. También puedes usar:
+Para probarlo desde **Actions → Monitor de boletas → Run workflow**, selecciona la rama predeterminada y marca **Enviar también un Telegram de prueba**. También puedes usar:
 
 ```bash
 gh workflow run monitor.yml --repo syrotechdr/doombot -f test_notification=true
 ```
 
-La prueba de WhatsApp es independiente de la lectura: si CallMeBot la rechaza, el workflow registra el fallo y aun así intenta revisar la cartelera. Una revisión exitosa sin funciones no demuestra que WhatsApp esté funcionando. Revisa que la prueba llegue antes de confiar en los avisos.
+La prueba de Telegram es independiente de la lectura: si Telegram la rechaza, el workflow registra el fallo y aun así intenta revisar la cartelera. Una revisión exitosa sin funciones no demuestra que Telegram esté funcionando. Revisa que la prueba llegue antes de confiar en los avisos.
 
 Para detenerlo, usa **Actions → Monitor de boletas → … → Disable workflow**. Para reanudarlo, pulsa **Enable workflow**. GitHub puede desactivar programaciones de repositorios públicos tras 60 días sin actividad; revisa la pestaña Actions si deja de ejecutarse. El workflow debe estar en la rama predeterminada.
 
 Esta modalidad no se despliega como una aplicación web en Vercel. El script original es un proceso de monitoreo; cambiarle el nombre a `app.py` no lo convierte en una función HTTP.
 
-## WhatsApp gratis: CallMeBot
+## Telegram (opción predeterminada)
+
+Usa la [API oficial de bots de Telegram](https://core.telegram.org/bots/api). Para estas alertas personales no requiere pago ni vincular tu WhatsApp. El bot te escribe desde su propia cuenta de Telegram.
+
+1. Abre [@BotFather](https://t.me/BotFather), envía `/newbot` y elige nombre y usuario para tu bot.
+2. Guarda el token en `TELEGRAM_BOT_TOKEN`, dentro de `.env` local o de los secretos de GitHub; nunca en el código ni en una URL pública.
+3. Abre el chat de tu bot y pulsa **Iniciar**. Telegram no permite que el bot te escriba antes de ese paso.
+4. Obtén el ID de ese chat privado mediante `getUpdates` de la API del bot y guárdalo en `TELEGRAM_CHAT_ID`. Verifica que corresponde a tu mensaje; no elijas el primer usuario desconocido que escriba al bot. No compartas la respuesta de la API, que puede incluir datos personales.
+5. Usa `NOTIFIER=telegram` y ejecuta `python monitor.py --test-notification`. Comprueba que la prueba aparece en tu chat.
+
+El envío usa HTTPS POST, sin formato HTML/Markdown para evitar interpretar caracteres del texto, y verifica la confirmación y el destinatario de la API antes de marcar el aviso como enviado. No se ejecuta un servidor de conversaciones: este bot solo envía alertas y no responde a comandos. No necesita mantener Telegram Web abierto. El token autoriza al bot, no da acceso a las conversaciones de tu cuenta personal.
+
+## Alternativa de WhatsApp: CallMeBot
 
 La documentación de [CallMeBot](https://www.callmebot.com/blog/free-api-whatsapp-messages/) ofrece la API gratis **solo para uso personal**, para avisarte a tu propio número. Es un servicio de terceros, separado de la API oficial de Meta. No requiere que tu WhatsApp Web permanezca abierto. Su continuidad y tiempos de entrega dependen del proveedor; el servidor donde corre el monitor puede tener costo.
 
@@ -145,6 +157,6 @@ En Linux sin las bibliotecas de Chromium, ejecuta `playwright install --with-dep
 .venv/bin/python -m unittest -v
 ```
 
-Cubren detección, estados incompletos, confirmaciones, errores de lectura/envío, reintentos, persistencia, deduplicación, salud y las solicitudes a ambos proveedores con respuestas simuladas. No envían WhatsApps reales.
+Cubren detección, estados incompletos, confirmaciones, errores de lectura/envío, reintentos, persistencia, deduplicación, salud y las solicitudes a los proveedores con respuestas simuladas. No envían mensajes reales.
 
-Para GitHub Actions necesitas el workflow habilitado, su rama de historial y secretos válidos. Docker requiere además un servidor. En ambos casos, el envío depende de una activación válida de CallMeBot; la lectura de la página puede probarse antes de configurar WhatsApp.
+Para GitHub Actions necesitas el workflow habilitado, su rama de historial y secretos válidos. Docker requiere además un servidor. El envío requiere un token y un chat válidos de Telegram, o las credenciales del proveedor alternativo elegido. La lectura de la página puede probarse antes de configurar las notificaciones.

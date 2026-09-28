@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       test_notification:
-        description: Enviar también un WhatsApp de prueba
+        description: Enviar también un Telegram de prueba
         required: false
         default: false
         type: boolean
@@ -37,7 +37,7 @@ jobs:
       CONFIRMATIONS: '1'
       PAGE_TIMEOUT_SECONDS: '60'
       NOTIFY_RETRY_SECONDS: '300'
-      NOTIFIER: callmebot
+      NOTIFIER: telegram
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -58,19 +58,19 @@ jobs:
       - name: Recuperar historial persistente
         id: restore
         run: python github_state.py restore
-      - name: Probar WhatsApp si se solicitó
-        id: whatsapp_test
+      - name: Probar Telegram si se solicitó
+        id: notification_test
         if: inputs.test_notification == true
         continue-on-error: true
         env:
-          CALLMEBOT_PHONE: ${{ secrets.CALLMEBOT_PHONE }}
-          CALLMEBOT_API_KEY: ${{ secrets.CALLMEBOT_API_KEY }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: python monitor.py --test-notification
       - name: Revisar cartelera y enviar aviso si corresponde
         id: check
         env:
-          CALLMEBOT_PHONE: ${{ secrets.CALLMEBOT_PHONE }}
-          CALLMEBOT_API_KEY: ${{ secrets.CALLMEBOT_API_KEY }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: python monitor.py --once
       - name: Guardar historial aunque falle la lectura o el envío
         if: always() && steps.restore.outcome == 'success'
@@ -78,8 +78,8 @@ jobs:
       - name: Resumen
         if: always()
         run: python github_state.py summary
-      - name: Señalar fallo de la prueba de WhatsApp
-        if: always() && steps.whatsapp_test.outcome == 'failure'
+      - name: Señalar fallo de la prueba de Telegram
+        if: always() && steps.notification_test.outcome == 'failure'
         run: |
-          echo '::error::CallMeBot no aceptó la prueba. Revisa la activación y el secreto CALLMEBOT_API_KEY.'
+          echo '::error::Telegram no aceptó la prueba. Revisa TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID y que hayas iniciado el chat con el bot.'
           exit 1

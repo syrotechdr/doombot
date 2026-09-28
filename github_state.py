@@ -83,7 +83,7 @@ def summary(directory):
             "### Monitor de Avengers: Doomsday\n\n"
             f"- Estado: `{state.get('last_status', 'sin revisar')}`\n"
             f"- Avisos aceptados: `{', '.join(state['sent']) or 'ninguno'}`\n"
-            f"- Error pendiente de WhatsApp: `{state.get('notification_error', False)}`\n"
+            f"- Error pendiente de notificación: `{state.get('notification_error', False)}`\n"
             "- La aceptación de la API no verifica la entrega al teléfono.\n"
         )
     target = os.getenv("GITHUB_STEP_SUMMARY")
