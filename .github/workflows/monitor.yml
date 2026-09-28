@@ -7,7 +7,7 @@ on:
       - '.github/workflows/monitor.yml'
   schedule:
     # Evita el minuto 0, donde suele concentrarse la carga de GitHub.
-    - cron: '2-57/5 * * * *'
+    - cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'
   workflow_dispatch:
     inputs:
       test_notification:

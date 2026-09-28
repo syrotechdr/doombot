@@ -20,7 +20,7 @@ El bot verifica la película y la sucursal, ignora cambios en trailers/carteles 
 
 [Ver ejecuciones del monitor](https://github.com/syrotechdr/doombot/actions/workflows/monitor.yml).
 
-El workflow `.github/workflows/monitor.yml` ejecuta `python monitor.py --once` en un runner estándar Ubuntu. La programación es `2-57/5 * * * *` (minutos 02, 07, 12… 57 de cada hora). No necesitas Vercel, tarjeta para pagar cómputo ni mantener tu computadora encendida. Las ejecuciones estándar son gratuitas mientras el repositorio sea público; se mantiene una caché pequeña de dependencias y Chromium, sin acumular artefactos de cada revisión.
+El workflow `.github/workflows/monitor.yml` ejecuta `python monitor.py --once` en un runner estándar Ubuntu. La programación es `2,7,12,17,22,27,32,37,42,47,52,57 * * * *` (minutos 02, 07, 12… 57 de cada hora). No necesitas Vercel, tarjeta para pagar cómputo ni mantener tu computadora encendida. Las ejecuciones estándar son gratuitas mientras el repositorio sea público; se mantiene una caché pequeña de dependencias y Chromium, sin acumular artefactos de cada revisión.
 
 En este modo se usa `CONFIRMATIONS=1`: avisa en la primera revisión que encuentre un horario reconocido, después de esperar que la página se estabilice. La revisión puede retrasarse por la cola de GitHub; no garantiza detectar en exactamente cinco minutos. Consulta [límites de programación](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule) y [uso gratuito](https://docs.github.com/en/billing/concepts/product-billing/github-actions).
 
