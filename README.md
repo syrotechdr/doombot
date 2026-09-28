@@ -18,7 +18,7 @@ El bot verifica la película y la sucursal, ignora cambios en trailers/carteles 
 
 ## GitHub Actions: cada cinco minutos
 
-[Ver ejecuciones del monitor](https://github.com/CristianJavierr/doombot/actions/workflows/monitor.yml).
+[Ver ejecuciones del monitor](https://github.com/syrotechdr/doombot/actions/workflows/monitor.yml).
 
 El workflow `.github/workflows/monitor.yml` ejecuta `python monitor.py --once` en un runner estándar Ubuntu. La programación es `2-57/5 * * * *` (minutos 02, 07, 12… 57 de cada hora). No necesitas Vercel, tarjeta para pagar cómputo ni mantener tu computadora encendida. Las ejecuciones estándar son gratuitas mientras el repositorio sea público; se mantiene una caché pequeña de dependencias y Chromium, sin acumular artefactos de cada revisión.
 
@@ -36,7 +36,7 @@ El historial persiste en la rama **`codex/monitor-state`**, con un único archiv
 Para probarlo desde **Actions → Monitor de boletas → Run workflow**, selecciona la rama predeterminada y marca **Enviar también un WhatsApp de prueba**. También puedes usar:
 
 ```bash
-gh workflow run monitor.yml --repo CristianJavierr/doombot -f test_notification=true
+gh workflow run monitor.yml --repo syrotechdr/doombot -f test_notification=true
 ```
 
 La prueba de WhatsApp es independiente de la lectura: si CallMeBot la rechaza, el workflow registra el fallo y aun así intenta revisar la cartelera. Una revisión exitosa sin funciones no demuestra que WhatsApp esté funcionando. Revisa que la prueba llegue antes de confiar en los avisos.
