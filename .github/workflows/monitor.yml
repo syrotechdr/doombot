@@ -1,6 +1,10 @@
 name: Monitor de boletas
 
 on:
+  push:
+    branches: [codex/initial-monitor]
+    paths:
+      - '.github/workflows/monitor.yml'
   schedule:
     # Evita el minuto 0, donde suele concentrarse la carga de GitHub.
     - cron: '2-57/5 * * * *'
