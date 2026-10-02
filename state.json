@@ -1,10 +1,15 @@
 {
   "url": "https://rd.caribbeancinemas.com/plaza-internacional-santiago/movie/avengers-doomsday/",
-  "sent": [],
-  "candidate": null,
-  "count": 0,
-  "last_check": 1790945330.473398,
-  "last_success": 1790945330.473398,
-  "last_status": "unavailable",
-  "consecutive_errors": 0
+  "sent": [
+    "available"
+  ],
+  "candidate": "available",
+  "count": 1,
+  "last_check": 1790964262.7528152,
+  "last_success": 1790964262.7528152,
+  "last_status": "available",
+  "consecutive_errors": 0,
+  "retry_after": 0,
+  "notification_error": false,
+  "notification_accepted_at": 1790964262.7528152
 }
